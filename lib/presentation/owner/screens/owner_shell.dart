@@ -12,21 +12,38 @@ class OwnerShell extends StatefulWidget {
 
 class _OwnerShellState extends State<OwnerShell> {
   int _index = 0;
-  final _screens = const [
-    OwnerDashboardScreen(),
-    OwnerOrdersScreen(),
-    OwnerInventoryScreen(),
+
+  final GlobalKey<OwnerDashboardScreenState> _dashboardKey =
+      GlobalKey<OwnerDashboardScreenState>();
+
+  late final List<Widget> _screens = [
+    OwnerDashboardScreen(key: _dashboardKey),
+    const OwnerOrdersScreen(),
+    const OwnerInventoryScreen(),
   ];
+
+  void _onDestinationSelected(int i) {
+    final wasOnDashboard = _index == 0;
+    setState(() => _index = i);
+    if (i == 0 && !wasOnDashboard) {
+      // Al volver al dashboard refrescamos los contadores por si la dueña
+      // agregó/editó repuestos o pedidos en las otras pestañas.
+      _dashboardKey.currentState?.refresh();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Theme(
       data: AppTheme.ownerTheme,
       child: Scaffold(
-        body: _screens[_index],
+        body: IndexedStack(
+          index: _index,
+          children: _screens,
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
+          onDestinationSelected: _onDestinationSelected,
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.dashboard_outlined),

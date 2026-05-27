@@ -31,6 +31,7 @@ class ProductModel {
       );
 
   Map<String, dynamic> toJson() => {
+        if (id.isNotEmpty) 'id': id,
         'name': name,
         'description': description,
         'price': price,
@@ -39,4 +40,27 @@ class ProductModel {
         'image_url': imageUrl,
         'is_active': isActive,
       };
+
+  ProductModel copyWith({
+    String? id,
+    String? name,
+    String? description,
+    double? price,
+    int? stock,
+    String? category,
+    String? imageUrl,
+    bool? isActive,
+    bool clearImageUrl = false,
+  }) {
+    return ProductModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      stock: stock ?? this.stock,
+      category: category ?? this.category,
+      imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
+      isActive: isActive ?? this.isActive,
+    );
+  }
 }

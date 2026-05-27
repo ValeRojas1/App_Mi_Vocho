@@ -19,6 +19,32 @@ class OrderRepository {
         .eq('id', orderId);
   }
 
+  /// Devuelve estadísticas para el dashboard de la dueña:
+  /// - todayCount: pedidos creados hoy (zona local del dispositivo).
+  /// - pendingCount: pedidos con status = 'pending'.
+  Future<({int todayCount, int pendingCount})> getDashboardStats() async {
+    final now = DateTime.now();
+    final startOfDayLocal = DateTime(now.year, now.month, now.day);
+    final startOfDayIso = startOfDayLocal.toUtc().toIso8601String();
+
+    final todayRes = await _client
+        .from('orders')
+        .select('id')
+        .gte('created_at', startOfDayIso)
+        .count(CountOption.exact);
+
+    final pendingRes = await _client
+        .from('orders')
+        .select('id')
+        .eq('status', 'pending')
+        .count(CountOption.exact);
+
+    return (
+      todayCount: todayRes.count,
+      pendingCount: pendingRes.count,
+    );
+  }
+
   Future<String> createOrder({
     required String clientId,
     required String pickupType,
