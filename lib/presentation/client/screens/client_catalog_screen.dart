@@ -4,9 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/repositories/product_repository.dart';
+import '../../shared/widgets/list_shimmer.dart';
 
 class ClientCatalogScreen extends StatefulWidget {
-  final Function(Map<String, dynamic>) onAddToCart;
+  final bool Function(Map<String, dynamic>) onAddToCart;
   const ClientCatalogScreen({super.key, required this.onAddToCart});
   @override
   State<ClientCatalogScreen> createState() => _ClientCatalogScreenState();
@@ -94,7 +95,7 @@ class _ClientCatalogScreenState extends State<ClientCatalogScreen> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const ListShimmer(itemCount: 4, itemHeight: 120)
                 : _products.isEmpty
                     ? Center(
                         child: Column(
@@ -143,7 +144,7 @@ class _ClientCatalogScreenState extends State<ClientCatalogScreen> {
 
 class _ProductCard extends StatelessWidget {
   final ProductModel product;
-  final Function(Map<String, dynamic>) onAddToCart;
+  final bool Function(Map<String, dynamic>) onAddToCart;
 
   const _ProductCard({required this.product, required this.onAddToCart});
 
@@ -254,17 +255,22 @@ class _ProductCard extends StatelessWidget {
                     onPressed: outOfStock
                         ? null
                         : () {
-                            onAddToCart({
+                            final added = onAddToCart({
                               'product_id': product.id,
                               'name': product.name,
                               'unit_price': product.price,
+                              'stock': product.stock,
                             });
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                    '¡${product.name} agregado al carrito!'),
-                                duration: const Duration(seconds: 1),
-                                backgroundColor: primary,
+                                  added
+                                      ? '¡${product.name} agregado al carrito!'
+                                      : 'Stock máximo alcanzado para este repuesto.',
+                                ),
+                                duration: const Duration(seconds: 2),
+                                backgroundColor:
+                                    added ? primary : const Color(0xFFC8102E),
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );

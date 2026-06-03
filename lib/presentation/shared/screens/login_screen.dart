@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import '../../../core/auth/auth_notifier.dart';
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final AuthNotifier authNotifier;
+
+  const LoginScreen({super.key, required this.authNotifier});
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -24,9 +26,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   // Animación del logotipo
   late AnimationController _logoAnimController;
   late Animation<double> _logoScale;
-
-  // Para el prototipo: email de la dueña hardcodeado
-  static const _ownerEmail = 'duena@lavolkswagen.com';
 
   @override
   void initState() {
@@ -51,7 +50,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
-  // Alterna entre modo de login y registro
+  void _goHome() {
+    if (widget.authNotifier.isOwner) {
+      context.go('/owner');
+    } else {
+      context.go('/client');
+    }
+  }
+
   void _toggleMode() {
     setState(() {
       _isRegisterMode = !_isRegisterMode;
@@ -104,8 +110,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             ),
           );
 
-          // Ir a clientes directamente con GoRouter (evita volver atrás)
-          context.go('/client');
+          await widget.authNotifier.loadRole();
+          if (!mounted) return;
+          _goHome();
         } else {
           // Caso 2: Confirmación de Email Habilitada en Supabase (Manejo de estado 'Email No Confirmado')
           showDialog(
@@ -156,11 +163,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         
         if (!mounted) return;
 
-        if (email == _ownerEmail) {
-          context.go('/owner');
-        } else {
-          context.go('/client');
-        }
+        await widget.authNotifier.loadRole();
+        if (!mounted) return;
+        _goHome();
       }
     } on AuthException catch (e) {
       if (!mounted) return;

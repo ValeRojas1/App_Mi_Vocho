@@ -49,7 +49,10 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
         backgroundColor: primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
-        label: const Text('Nuevo Repuesto', style: TextStyle(fontWeight: FontWeight.bold)),
+        label: const Text(
+          'Nuevo Repuesto',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
       body: Column(
         children: [
@@ -58,7 +61,9 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
             child: Card(
               elevation: 4,
               shadowColor: primary.withValues(alpha: 0.05),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: TextField(
@@ -77,7 +82,8 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
                             onPressed: () {
                               _searchCtrl.clear();
                               _load('');
-                            })
+                            },
+                          )
                         : null,
                   ),
                   onChanged: (v) => _load(v),
@@ -89,21 +95,51 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _products.isEmpty
-                    ? _EmptyState(onAdd: () => _openForm(context, null))
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: _products.length,
-                        itemBuilder: (_, i) => _ProductTile(
-                          product: _products[i],
-                          onStockEdit: (p) => _showStockDialog(context, p),
-                          onTap: (p) => _openForm(context, p),
-                        ),
-                      ),
+                ? _EmptyState(onAdd: () => _openForm(context, null))
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _products.length,
+                    itemBuilder: (_, i) => _ProductTile(
+                      product: _products[i],
+                      onStockEdit: (p) => _showStockDialog(context, p),
+                      onTap: (p) => _openForm(context, p),
+                      onToggleActive: _toggleProductActive,
+                    ),
+                  ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _toggleProductActive(ProductModel product, bool active) async {
+    try {
+      await _repo.setProductActive(product.id, active);
+      if (!mounted) return;
+      _load(_searchCtrl.text);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            active
+                ? '${product.name} visible en catálogo'
+                : '${product.name} oculto del catálogo',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo actualizar: $e'),
+          backgroundColor: const Color(0xFFC8102E),
+        ),
+      );
+    }
   }
 
   void _openForm(BuildContext context, ProductModel? product) {
@@ -130,7 +166,10 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Actualizar Stock',
-          style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.primary,
+          ),
         ),
         content: Form(
           key: formKey,
@@ -140,7 +179,10 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
             children: [
               Text(
                 product.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -153,7 +195,8 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Ingresa una cantidad';
                   final val = int.tryParse(v);
-                  if (val == null || val < 0) return 'Ingresa un número entero válido';
+                  if (val == null || val < 0)
+                    return 'Ingresa un número entero válido';
                   return null;
                 },
               ),
@@ -168,10 +211,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
           ElevatedButton(
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
-              await _repo.updateStock(
-                product.id,
-                int.parse(stockCtrl.text),
-              );
+              await _repo.updateStock(product.id, int.parse(stockCtrl.text));
               if (context.mounted) Navigator.pop(context);
               _load(_searchCtrl.text);
             },
@@ -187,11 +227,13 @@ class _ProductTile extends StatelessWidget {
   final ProductModel product;
   final Function(ProductModel) onStockEdit;
   final Function(ProductModel) onTap;
+  final void Function(ProductModel, bool) onToggleActive;
 
   const _ProductTile({
     required this.product,
     required this.onStockEdit,
     required this.onTap,
+    required this.onToggleActive,
   });
 
   @override
@@ -201,105 +243,174 @@ class _ProductTile extends StatelessWidget {
     final primary = theme.colorScheme.primary;
     final hasImage = product.imageUrl != null && product.imageUrl!.isNotEmpty;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shadowColor: primary.withValues(alpha: 0.03),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade100, width: 1),
-      ),
-      child: ListTile(
-        onTap: () => onTap(product),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            width: 56,
-            height: 56,
-            child: hasImage
-                ? CachedNetworkImage(
-                    imageUrl: product.imageUrl!,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(
-                      color: primary.withValues(alpha: 0.05),
-                      child: const Center(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    ),
-                    errorWidget: (_, __, ___) => _placeholderIcon(primary),
-                  )
-                : _placeholderIcon(primary),
+    return Opacity(
+      opacity: product.isActive ? 1 : 0.65,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 2,
+        shadowColor: primary.withValues(alpha: 0.03),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: product.isActive
+                ? Colors.grey.shade100
+                : Colors.orange.shade200,
           ),
         ),
-        title: Text(
-          product.name,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: primary,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            product.category ?? 'Sin categoría',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-          ),
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              'S/. ${product.price.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                color: primary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            GestureDetector(
-              onTap: () => onStockEdit(product),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: lowStock
-                      ? const Color(0xFFC8102E).withValues(alpha: 0.08)
-                      : Colors.green.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: lowStock
-                        ? const Color(0xFFC8102E).withValues(alpha: 0.2)
-                        : Colors.green.withValues(alpha: 0.2),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => onTap(product),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: hasImage
+                        ? CachedNetworkImage(
+                            imageUrl: product.imageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                              color: primary.withValues(alpha: 0.05),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (_, __, ___) =>
+                                _placeholderIcon(primary),
+                          )
+                        : _placeholderIcon(primary),
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      lowStock ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                      size: 12,
-                      color: lowStock ? const Color(0xFFC8102E) : Colors.green,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Stock: ${product.stock}',
-                      style: TextStyle(
-                        color: lowStock ? const Color(0xFFC8102E) : Colors.green,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              product.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: primary,
+                              ),
+                            ),
+                          ),
+                          Transform.scale(
+                            scale: 0.78,
+                            child: Switch(
+                              value: product.isActive,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              onChanged: (v) => onToggleActive(product, v),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      Text(
+                        product.category ?? 'Sin categoría',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 11,
+                        ),
+                      ),
+                      if (!product.isActive)
+                        Text(
+                          'Inactivo en catálogo',
+                          style: TextStyle(
+                            color: Colors.orange.shade800,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Text(
+                            'S/. ${product.price.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: primary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: GestureDetector(
+                              onTap: () => onStockEdit(product),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: lowStock
+                                      ? const Color(0xFFC8102E)
+                                          .withValues(alpha: 0.08)
+                                      : Colors.green.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: lowStock
+                                        ? const Color(0xFFC8102E)
+                                            .withValues(alpha: 0.2)
+                                        : Colors.green
+                                            .withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      lowStock
+                                          ? Icons.warning_amber_rounded
+                                          : Icons.check_circle_outline,
+                                      size: 11,
+                                      color: lowStock
+                                          ? const Color(0xFFC8102E)
+                                          : Colors.green,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Flexible(
+                                      child: Text(
+                                        'Stock: ${product.stock}',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: lowStock
+                                              ? const Color(0xFFC8102E)
+                                              : Colors.green,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -332,7 +443,11 @@ class _EmptyState extends StatelessWidget {
                 color: Colors.grey.shade100,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
+              child: Icon(
+                Icons.inventory_2_outlined,
+                size: 64,
+                color: Colors.grey.shade400,
+              ),
             ),
             const SizedBox(height: 20),
             Text(
@@ -361,6 +476,8 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+enum _UnsavedAction { cancel, discard, save }
+
 class _ProductFormScreen extends StatefulWidget {
   final ProductModel? existing;
   final ProductRepository repository;
@@ -386,6 +503,14 @@ class _ProductFormScreenState extends State<_ProductFormScreen> {
   late final TextEditingController _catCtrl;
   late final TextEditingController _descCtrl;
 
+  // Snapshot inicial para detectar cambios sin guardar al intentar salir.
+  late final String _initialName;
+  late final String _initialPrice;
+  late final String _initialStock;
+  late final String _initialCat;
+  late final String _initialDesc;
+  String? _initialImageUrl;
+
   bool _saving = false;
   String? _imageUrl; // URL persistida en BD
   XFile? _pickedImage; // imagen seleccionada (todavía no subida)
@@ -398,13 +523,129 @@ class _ProductFormScreenState extends State<_ProductFormScreen> {
   void initState() {
     super.initState();
     final e = widget.existing;
-    _nameCtrl = TextEditingController(text: e?.name ?? '');
-    _priceCtrl = TextEditingController(
-        text: e == null ? '' : e.price.toStringAsFixed(2));
-    _stockCtrl = TextEditingController(text: e == null ? '' : e.stock.toString());
-    _catCtrl = TextEditingController(text: e?.category ?? '');
-    _descCtrl = TextEditingController(text: e?.description ?? '');
-    _imageUrl = e?.imageUrl;
+    _initialName = e?.name ?? '';
+    _initialPrice = e == null ? '' : e.price.toStringAsFixed(2);
+    _initialStock = e == null ? '' : e.stock.toString();
+    _initialCat = e?.category ?? '';
+    _initialDesc = e?.description ?? '';
+    _initialImageUrl = e?.imageUrl;
+
+    _nameCtrl = TextEditingController(text: _initialName);
+    _priceCtrl = TextEditingController(text: _initialPrice);
+    _stockCtrl = TextEditingController(text: _initialStock);
+    _catCtrl = TextEditingController(text: _initialCat);
+    _descCtrl = TextEditingController(text: _initialDesc);
+    _imageUrl = _initialImageUrl;
+  }
+
+  /// Detecta si la dueña modificó algo respecto al snapshot inicial.
+  /// - En modo "Nuevo": cualquier campo con contenido cuenta como cambio.
+  /// - En modo "Editar": compara cada campo y la imagen seleccionada/quitada.
+  bool _hasUnsavedChanges() {
+    final nameChanged = _nameCtrl.text.trim() != _initialName.trim();
+    final priceChanged = _priceCtrl.text.trim() != _initialPrice.trim();
+    final stockChanged = _stockCtrl.text.trim() != _initialStock.trim();
+    final catChanged = _catCtrl.text.trim() != _initialCat.trim();
+    final descChanged = _descCtrl.text.trim() != _initialDesc.trim();
+    final imageChanged =
+        _pickedImage != null || (_removeImage && _initialImageUrl != null);
+
+    return nameChanged ||
+        priceChanged ||
+        stockChanged ||
+        catChanged ||
+        descChanged ||
+        imageChanged;
+  }
+
+  /// Se invoca cuando la dueña intenta retroceder. Si hay cambios sin guardar
+  /// muestra un diálogo con tres opciones: Guardar, Descartar o Cancelar.
+  Future<void> _handleBackPressed() async {
+    // Mientras está guardando no permitimos salir.
+    if (_saving) return;
+
+    if (!_hasUnsavedChanges()) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+
+    final action = await showDialog<_UnsavedAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Cambios sin guardar',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          _isEditing
+              ? 'Has modificado los datos de este repuesto. ¿Qué deseas hacer antes de salir?'
+              : 'Has empezado a registrar un nuevo repuesto. ¿Qué deseas hacer antes de salir?',
+          style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _UnsavedAction.cancel),
+            child: Text(
+              'Seguir editando',
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _UnsavedAction.discard),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Descartar'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, _UnsavedAction.save),
+            icon: const Icon(Icons.save_outlined, size: 18),
+            label: const Text('Guardar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _UnsavedAction.cancel:
+        return;
+      case _UnsavedAction.discard:
+        Navigator.pop(context);
+        return;
+      case _UnsavedAction.save:
+        // _save() ya hace Navigator.pop al terminar correctamente.
+        await _save();
+        return;
+    }
   }
 
   @override
@@ -498,9 +739,12 @@ class _ProductFormScreenState extends State<_ProductFormScreen> {
       final base = ProductModel(
         id: widget.existing?.id ?? '',
         name: _nameCtrl.text.trim(),
-        description:
-            _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-        category: _catCtrl.text.trim().isEmpty ? 'General' : _catCtrl.text.trim(),
+        description: _descCtrl.text.trim().isEmpty
+            ? null
+            : _descCtrl.text.trim(),
+        category: _catCtrl.text.trim().isEmpty
+            ? 'General'
+            : _catCtrl.text.trim(),
         price: double.parse(_priceCtrl.text),
         stock: int.parse(_stockCtrl.text),
         imageUrl: _removeImage ? null : _imageUrl,
@@ -536,9 +780,11 @@ class _ProductFormScreenState extends State<_ProductFormScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isEditing
-                ? 'Repuesto actualizado correctamente'
-                : 'Repuesto creado correctamente'),
+            content: Text(
+              _isEditing
+                  ? 'Repuesto actualizado correctamente'
+                  : 'Repuesto creado correctamente',
+            ),
             backgroundColor: Theme.of(context).colorScheme.primary,
             behavior: SnackBarBehavior.floating,
           ),
@@ -571,137 +817,159 @@ class _ProductFormScreenState extends State<_ProductFormScreen> {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Editar Repuesto' : 'Nuevo Repuesto'),
-      ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ImagePickerField(
-                imageUrl: _removeImage ? null : _imageUrl,
-                pickedBytes: _pickedBytes,
-                pickedXFilePath: _pickedImage?.path,
-                onTap: _showImageSourceSheet,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Detalles de la Pieza',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: primary,
+    return PopScope(
+      // canPop: false hace que cualquier intento de retroceso (flecha del AppBar,
+      // botón atrás del sistema, gesto de swipe en iOS) sea interceptado por
+      // onPopInvokedWithResult, donde decidimos si mostrar el diálogo o salir.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        _handleBackPressed();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_isEditing ? 'Editar Repuesto' : 'Nuevo Repuesto'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _handleBackPressed,
+          ),
+        ),
+        body: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ImagePickerField(
+                  imageUrl: _removeImage ? null : _imageUrl,
+                  pickedBytes: _pickedBytes,
+                  pickedXFilePath: _pickedImage?.path,
+                  onTap: _showImageSourceSheet,
                 ),
-              ),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: _nameCtrl,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del repuesto',
-                  prefixIcon: Icon(Icons.build_outlined),
-                  hintText: 'Ej. Faros Neblineros delanteros',
-                ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Ingresa el nombre del repuesto';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _catCtrl,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Categoría',
-                  prefixIcon: Icon(Icons.category_outlined),
-                  hintText: 'Ej. Motor, Carrocería, Faros',
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descCtrl,
-                textCapitalization: TextCapitalization.sentences,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción (opcional)',
-                  prefixIcon: Icon(Icons.description_outlined),
-                  hintText: 'Detalles, compatibilidad, etc.',
-                  alignLabelWithHint: true,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _priceCtrl,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Precio (S/.)',
-                        prefixIcon: Icon(Icons.monetization_on_outlined),
-                        hintText: '0.00',
-                      ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Ingresa el precio';
-                        final val = double.tryParse(v);
-                        if (val == null || val <= 0) return 'Precio inválido';
-                        return null;
-                      },
-                    ),
+                const SizedBox(height: 24),
+                Text(
+                  'Detalles de la Pieza',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: primary,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _stockCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: _isEditing ? 'Stock' : 'Stock Inicial',
-                        prefixIcon: const Icon(Icons.inventory_2_outlined),
-                        hintText: '0',
-                      ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Ingresa el stock';
-                        final val = int.tryParse(v);
-                        if (val == null || val < 0) return 'Stock inválido';
-                        return null;
-                      },
-                    ),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _nameCtrl,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del repuesto',
+                    prefixIcon: Icon(Icons.build_outlined),
+                    hintText: 'Ej. Faros Neblineros delanteros',
                   ),
-                ],
-              ),
-              const SizedBox(height: 36),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: primary,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Ingresa el nombre del repuesto';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _catCtrl,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Categoría',
+                    prefixIcon: Icon(Icons.category_outlined),
+                    hintText: 'Ej. Motor, Carrocería, Faros',
                   ),
-                  child: _saving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
-                        )
-                      : Text(
-                          _isEditing
-                              ? 'ACTUALIZAR REPUESTO'
-                              : 'GUARDAR REPUESTO',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _descCtrl,
+                  textCapitalization: TextCapitalization.sentences,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción (opcional)',
+                    prefixIcon: Icon(Icons.description_outlined),
+                    hintText: 'Detalles, compatibilidad, etc.',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _priceCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
                         ),
+                        decoration: const InputDecoration(
+                          labelText: 'Precio (S/.)',
+                          prefixIcon: Icon(Icons.monetization_on_outlined),
+                          hintText: '0.00',
+                        ),
+                        validator: (v) {
+                          if (v == null || v.isEmpty)
+                            return 'Ingresa el precio';
+                          final val = double.tryParse(v);
+                          if (val == null || val <= 0) return 'Precio inválido';
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _stockCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: _isEditing ? 'Stock' : 'Stock Inicial',
+                          prefixIcon: const Icon(Icons.inventory_2_outlined),
+                          hintText: '0',
+                        ),
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Ingresa el stock';
+                          final val = int.tryParse(v);
+                          if (val == null || val < 0) return 'Stock inválido';
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 36),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _saving ? null : _save,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: primary,
+                    ),
+                    child: _saving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            _isEditing
+                                ? 'ACTUALIZAR REPUESTO'
+                                : 'GUARDAR REPUESTO',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -780,7 +1048,10 @@ class _ImagePickerField extends StatelessWidget {
               right: 12,
               bottom: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: primary,
                   borderRadius: BorderRadius.circular(20),
@@ -795,15 +1066,19 @@ class _ImagePickerField extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: const [
-                    Icon(Icons.camera_alt_outlined,
-                        color: Colors.white, size: 16),
+                    Icon(
+                      Icons.camera_alt_outlined,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                     SizedBox(width: 6),
                     Text(
                       'Cambiar',
                       style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -819,8 +1094,11 @@ class _ImagePickerField extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.add_a_photo_outlined,
-            size: 44, color: primary.withValues(alpha: 0.7)),
+        Icon(
+          Icons.add_a_photo_outlined,
+          size: 44,
+          color: primary.withValues(alpha: 0.7),
+        ),
         const SizedBox(height: 8),
         Text(
           'Agregar imagen del repuesto',

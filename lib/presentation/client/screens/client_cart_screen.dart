@@ -1,13 +1,34 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/app_formatters.dart';
 import 'checkout_screen.dart';
 
 class ClientCartScreen extends StatelessWidget {
   final List<Map<String, dynamic>> cart;
   final VoidCallback onCartUpdated;
-  const ClientCartScreen({super.key, required this.cart, required this.onCartUpdated});
+  final VoidCallback onCheckoutSuccess;
 
-  double get _total => cart.fold(0, (sum, item) =>
-      sum + (item['unit_price'] as double) * (item['quantity'] as int));
+  const ClientCartScreen({
+    super.key,
+    required this.cart,
+    required this.onCartUpdated,
+    required this.onCheckoutSuccess,
+  });
+
+  double get _total => cart.fold(
+        0.0,
+        (sum, item) =>
+            sum +
+            (item['unit_price'] as double) * (item['quantity'] as int),
+      );
+
+  void _showStockMessage(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Ya alcanzaste el stock disponible de este repuesto.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,16 +84,21 @@ class ClientCartScreen extends StatelessWidget {
                     itemCount: cart.length,
                     itemBuilder: (_, i) {
                       final item = cart[i];
+                      final stock = item['stock'] as int;
+                      final qty = item['quantity'] as int;
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
                         elevation: 2,
                         shadowColor: primary.withValues(alpha: 0.03),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: Colors.grey.shade100, width: 1),
+                          side: BorderSide(color: Colors.grey.shade100),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                            horizontal: 8,
+                          ),
                           child: ListTile(
                             leading: Container(
                               padding: const EdgeInsets.all(10),
@@ -80,7 +106,7 @@ class ClientCartScreen extends StatelessWidget {
                                 color: secondary.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(Icons.build_outlined, color: primary, size: 22),
+                              child: Icon(Icons.build_outlined, color: primary),
                             ),
                             title: Text(
                               item['name'],
@@ -91,18 +117,20 @@ class ClientCartScreen extends StatelessWidget {
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Text(
-                                'S/. ${(item['unit_price'] as double).toStringAsFixed(2)} c/u',
-                                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                                '${AppFormatters.currency(item['unit_price'] as double)} c/u · máx. $stock',
+                                style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // Botón disminuir cantidad
                                 InkWell(
                                   onTap: () {
-                                    if (item['quantity'] > 1) {
-                                      item['quantity']--;
+                                    if (qty > 1) {
+                                      item['quantity'] = qty - 1;
                                     } else {
                                       cart.removeAt(i);
                                     }
@@ -112,31 +140,38 @@ class ClientCartScreen extends StatelessWidget {
                                     padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.grey.shade300),
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                      ),
                                     ),
                                     child: Icon(Icons.remove, size: 14, color: primary),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Text(
-                                  '${item['quantity']}',
+                                  '$qty',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                // Botón aumentar cantidad
                                 InkWell(
                                   onTap: () {
-                                    item['quantity']++;
+                                    if (qty >= stock) {
+                                      _showStockMessage(context);
+                                      return;
+                                    }
+                                    item['quantity'] = qty + 1;
                                     onCartUpdated();
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.grey.shade300),
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                      ),
                                       color: primary.withValues(alpha: 0.05),
                                     ),
                                     child: Icon(Icons.add, size: 14, color: primary),
@@ -150,8 +185,6 @@ class ClientCartScreen extends StatelessWidget {
                     },
                   ),
                 ),
-                
-                // Panel de Resumen de Pago premium
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -165,7 +198,7 @@ class ClientCartScreen extends StatelessWidget {
                         color: primary.withValues(alpha: 0.05),
                         blurRadius: 15,
                         offset: const Offset(0, -6),
-                      )
+                      ),
                     ],
                   ),
                   child: Column(
@@ -178,11 +211,10 @@ class ClientCartScreen extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 15,
                               color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
                             ),
                           ),
                           Text(
-                            'S/. ${_total.toStringAsFixed(2)}',
+                            AppFormatters.currency(_total),
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
@@ -192,7 +224,6 @@ class ClientCartScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      
                       SizedBox(
                         width: double.infinity,
                         height: 52,
@@ -200,12 +231,10 @@ class ClientCartScreen extends StatelessWidget {
                           icon: const Icon(Icons.payment_rounded, size: 20),
                           label: const Text(
                             'PROCEDER AL PAGO',
-                            style: TextStyle(letterSpacing: 0.5, fontWeight: FontWeight.bold),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            style: TextStyle(
+                              letterSpacing: 0.5,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           onPressed: () => Navigator.push(
                             context,
@@ -213,6 +242,7 @@ class ClientCartScreen extends StatelessWidget {
                               builder: (_) => CheckoutScreen(
                                 cart: List.from(cart),
                                 total: _total,
+                                onOrderSuccess: onCheckoutSuccess,
                               ),
                             ),
                           ),

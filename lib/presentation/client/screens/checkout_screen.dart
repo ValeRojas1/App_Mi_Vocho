@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/constants/order_constants.dart';
+import '../../../core/utils/app_errors.dart';
+import '../../../core/utils/app_formatters.dart';
 import '../../../data/repositories/order_repository.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final List<Map<String, dynamic>> cart;
   final double total;
-  const CheckoutScreen({super.key, required this.cart, required this.total});
+  final VoidCallback onOrderSuccess;
+
+  const CheckoutScreen({
+    super.key,
+    required this.cart,
+    required this.total,
+    required this.onOrderSuccess,
+  });
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
 }
@@ -62,7 +72,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al procesar: $e'),
+          content: Text(AppErrors.message(e)),
           backgroundColor: const Color(0xFFC8102E),
           behavior: SnackBarBehavior.floating,
         ),
@@ -107,13 +117,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Pedido #${orderId.substring(0, 8).toUpperCase()}',
+                  'Pedido #${AppFormatters.orderShortId(orderId)}',
                   style: TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                _pickupType == 'local'
+                _pickupType == PickupType.local.value
                     ? '✅ Tu pedido ha sido registrado. Puedes recoger tu repuesto en tienda cuando esté listo.'
                     : '📦 Tu pedido se enviará por encomienda interprovincial a la brevedad.',
                 textAlign: TextAlign.center,
@@ -128,9 +138,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             height: 48,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.pop(context);       // cierra dialog
-                Navigator.pop(context);       // vuelve al carrito
-                Navigator.pop(context);       // vuelve al catálogo
+                Navigator.pop(context);
+                Navigator.pop(context);
+                widget.onOrderSuccess();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: primary,
@@ -193,7 +203,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ],
                         ),
                         Text(
-                          'S/. ${widget.total.toStringAsFixed(2)}',
+                          AppFormatters.currency(widget.total),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 24,
@@ -203,6 +213,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ],
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Resumen del pedido',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: primary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  children: widget.cart.map((item) {
+                    final qty = item['quantity'] as int;
+                    final price = item['unit_price'] as double;
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        item['name'] as String,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text('$qty unidad${qty > 1 ? 'es' : ''}'),
+                      trailing: Text(
+                        AppFormatters.currency(price * qty),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: primary,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
               const SizedBox(height: 24),
@@ -223,8 +269,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       icon: Icons.storefront_outlined,
                       label: 'Recojo en tienda',
                       subtitle: 'Huancayo',
-                      selected: _pickupType == 'local',
-                      onTap: () => setState(() => _pickupType = 'local'),
+                      selected: _pickupType == PickupType.local.value,
+                      onTap: () => setState(() => _pickupType = PickupType.local.value),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -233,8 +279,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       icon: Icons.local_shipping_outlined,
                       label: 'Envío interprovincial',
                       subtitle: 'Todo el Perú',
-                      selected: _pickupType == 'interprovincial',
-                      onTap: () => setState(() => _pickupType = 'interprovincial'),
+                      selected: _pickupType == PickupType.interprovincial.value,
+                      onTap: () =>
+                          setState(() => _pickupType = PickupType.interprovincial.value),
                     ),
                   ),
                 ],
@@ -361,7 +408,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       : const Icon(Icons.lock_outline),
                   label: Text(_processing
                       ? 'Procesando Pago...'
-                      : 'PAGAR S/. ${widget.total.toStringAsFixed(2)}'),
+                      : 'PAGAR ${AppFormatters.currency(widget.total)}'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,

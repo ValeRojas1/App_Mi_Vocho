@@ -46,6 +46,13 @@ class ProductRepository {
         .eq('id', productId);
   }
 
+  Future<void> setProductActive(String productId, bool isActive) async {
+    await _client
+        .from('products')
+        .update({'is_active': isActive})
+        .eq('id', productId);
+  }
+
   /// Devuelve estadísticas para el dashboard de la dueña:
   /// - activeCount: repuestos con is_active = true.
   /// - lowStockCount: repuestos activos con stock <= [lowStockThreshold].
