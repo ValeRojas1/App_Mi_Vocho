@@ -17,8 +17,6 @@ class AdminShell extends StatefulWidget {
 class _AdminShellState extends State<AdminShell> {
   int _index = 0;
 
-  final _screens = const [AdminUsersScreen(), AdminStatsScreen()];
-
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -47,12 +45,24 @@ class _AdminShellState extends State<AdminShell> {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+    final usersScreen = AdminUsersScreen(
+      key: const ValueKey('admin-users'),
+      embedded: true,
+    );
+    final statsScreen = AdminStatsScreen(
+      key: const ValueKey('admin-stats'),
+      embedded: true,
+    );
 
     return Theme(
       data: AppTheme.adminTheme,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 900;
+          final body = IndexedStack(
+            index: _index,
+            children: [usersScreen, statsScreen],
+          );
 
           if (isWide) {
             return Scaffold(
@@ -85,23 +95,18 @@ class _AdminShellState extends State<AdminShell> {
                         label: Text('Estadísticas'),
                       ),
                     ],
-                    trailing: Expanded(
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: IconButton(
-                            tooltip: 'Cerrar sesión',
-                            icon: const Icon(Icons.logout),
-                            color: primary,
-                            onPressed: _logout,
-                          ),
-                        ),
+                    trailing: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: IconButton(
+                        tooltip: 'Cerrar sesión',
+                        icon: const Icon(Icons.logout),
+                        color: primary,
+                        onPressed: _logout,
                       ),
                     ),
                   ),
                   const VerticalDivider(width: 1),
-                  Expanded(child: _screens[_index]),
+                  Expanded(child: body),
                 ],
               ),
             );
@@ -118,7 +123,7 @@ class _AdminShellState extends State<AdminShell> {
                 ),
               ],
             ),
-            body: _screens[_index],
+            body: body,
             bottomNavigationBar: NavigationBar(
               selectedIndex: _index,
               onDestinationSelected: (i) => setState(() => _index = i),

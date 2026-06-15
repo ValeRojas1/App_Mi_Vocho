@@ -23,6 +23,18 @@ class AuthNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Espera a que el rol esté disponible (evita redirecciones prematuras en web).
+  Future<void> ensureRoleLoaded() async {
+    if (_role != null) return;
+    if (_loading) {
+      while (_loading) {
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+      }
+      return;
+    }
+    await loadRole();
+  }
+
   void clear() {
     _role = null;
     _loading = false;

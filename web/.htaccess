@@ -1,0 +1,23 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Sirve archivos estáticos existentes (js, wasm, assets, etc.)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Rutas de Flutter web (go_router): /login, /admin, etc.
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Tipos MIME para Flutter web
+<IfModule mod_mime.c>
+  AddType application/wasm .wasm
+  AddType application/javascript .js
+</IfModule>
+
+# Compresión básica (Hostinger Apache)
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css application/javascript application/wasm
+</IfModule>

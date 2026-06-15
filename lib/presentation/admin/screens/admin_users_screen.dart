@@ -8,7 +8,9 @@ import '../../shared/widgets/branded_app_bar_title.dart';
 import '../../shared/widgets/list_shimmer.dart';
 
 class AdminUsersScreen extends StatefulWidget {
-  const AdminUsersScreen({super.key});
+  final bool embedded;
+
+  const AdminUsersScreen({super.key, this.embedded = false});
 
   @override
   State<AdminUsersScreen> createState() => _AdminUsersScreenState();
@@ -227,6 +229,170 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
 
+    final content = _loading
+        ? const ListShimmer(itemCount: 6, itemHeight: 72)
+        : _error != null
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(_error!),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: refresh,
+                  child: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          )
+        : RefreshIndicator(
+            onRefresh: refresh,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth >= 700) {
+                  return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(20),
+                    child: DataTable(
+                      headingRowColor: WidgetStatePropertyAll(
+                        primary.withValues(alpha: 0.06),
+                      ),
+                      columns: const [
+                        DataColumn(label: Text('Nombre')),
+                        DataColumn(label: Text('Correo')),
+                        DataColumn(label: Text('Rol')),
+                        DataColumn(label: Text('Acciones')),
+                      ],
+                      rows: _users.map((user) {
+                        return DataRow(
+                          cells: [
+                            DataCell(Text(user.fullName ?? '—')),
+                            DataCell(Text(user.email)),
+                            DataCell(
+                              DropdownButton<String>(
+                                value: user.role,
+                                underline: const SizedBox.shrink(),
+                                items: AppRole.values
+                                    .map(
+                                      (r) => DropdownMenuItem(
+                                        value: r.value,
+                                        child: Text(r.label),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (role) {
+                                  if (role == null || role == user.role) {
+                                    return;
+                                  }
+                                  _changeRole(user, role);
+                                },
+                              ),
+                            ),
+                            DataCell(
+                              IconButton(
+                                tooltip: 'Eliminar',
+                                icon: Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red.shade700,
+                                ),
+                                onPressed: () => _confirmDelete(user),
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                  itemCount: _users.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final user = _users[index];
+                    return Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user.fullName ?? user.email,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              user.email,
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    initialValue: user.role,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Rol',
+                                      isDense: true,
+                                    ),
+                                    items: AppRole.values
+                                        .map(
+                                          (r) => DropdownMenuItem(
+                                            value: r.value,
+                                            child: Text(r.label),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (role) {
+                                      if (role == null || role == user.role) {
+                                        return;
+                                      }
+                                      _changeRole(user, role);
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Eliminar',
+                                  onPressed: () => _confirmDelete(user),
+                                  icon: Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          );
+
+    if (widget.embedded) {
+      return Stack(
+        children: [
+          Positioned.fill(child: content),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: FloatingActionButton.extended(
+              onPressed: _showCreateDialog,
+              icon: const Icon(Icons.person_add_outlined),
+              label: const Text('Nuevo usuario'),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const BrandedAppBarTitle(subtitle: 'Gestión de usuarios'),
@@ -243,153 +409,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         icon: const Icon(Icons.person_add_outlined),
         label: const Text('Nuevo usuario'),
       ),
-      body: _loading
-          ? const ListShimmer(itemCount: 6, itemHeight: 72)
-          : _error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(_error!),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: refresh,
-                    child: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: refresh,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  if (constraints.maxWidth >= 700) {
-                    return SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(20),
-                      child: DataTable(
-                        headingRowColor: WidgetStatePropertyAll(
-                          primary.withValues(alpha: 0.06),
-                        ),
-                        columns: const [
-                          DataColumn(label: Text('Nombre')),
-                          DataColumn(label: Text('Correo')),
-                          DataColumn(label: Text('Rol')),
-                          DataColumn(label: Text('Acciones')),
-                        ],
-                        rows: _users.map((user) {
-                          return DataRow(
-                            cells: [
-                              DataCell(Text(user.fullName ?? '—')),
-                              DataCell(Text(user.email)),
-                              DataCell(
-                                DropdownButton<String>(
-                                  value: user.role,
-                                  underline: const SizedBox.shrink(),
-                                  items: AppRole.values
-                                      .map(
-                                        (r) => DropdownMenuItem(
-                                          value: r.value,
-                                          child: Text(r.label),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (role) {
-                                    if (role == null || role == user.role) {
-                                      return;
-                                    }
-                                    _changeRole(user, role);
-                                  },
-                                ),
-                              ),
-                              DataCell(
-                                IconButton(
-                                  tooltip: 'Eliminar',
-                                  icon: Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.red.shade700,
-                                  ),
-                                  onPressed: () => _confirmDelete(user),
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    );
-                  }
-
-                  return ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-                    itemCount: _users.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final user = _users[index];
-                      return Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                user.fullName ?? user.email,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                user.email,
-                                style: TextStyle(color: Colors.grey.shade600),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: DropdownButtonFormField<String>(
-                                      initialValue: user.role,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Rol',
-                                        isDense: true,
-                                      ),
-                                      items: AppRole.values
-                                          .map(
-                                            (r) => DropdownMenuItem(
-                                              value: r.value,
-                                              child: Text(r.label),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (role) {
-                                        if (role == null ||
-                                            role == user.role) {
-                                          return;
-                                        }
-                                        _changeRole(user, role);
-                                      },
-                                    ),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Eliminar',
-                                    onPressed: () => _confirmDelete(user),
-                                    icon: Icon(
-                                      Icons.delete_outline,
-                                      color: Colors.red.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
+      body: content,
     );
   }
 }

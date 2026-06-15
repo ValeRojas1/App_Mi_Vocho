@@ -9,7 +9,9 @@ import '../../shared/widgets/branded_app_bar_title.dart';
 import '../../shared/widgets/list_shimmer.dart';
 
 class AdminStatsScreen extends StatefulWidget {
-  const AdminStatsScreen({super.key});
+  final bool embedded;
+
+  const AdminStatsScreen({super.key, this.embedded = false});
 
   @override
   State<AdminStatsScreen> createState() => _AdminStatsScreenState();
@@ -61,6 +63,110 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
 
+    final toolbar = Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        PopupMenuButton<int>(
+          tooltip: 'Rango de días',
+          onSelected: _changeRange,
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 7, child: Text('Últimos 7 días')),
+            PopupMenuItem(value: 30, child: Text('Últimos 30 días')),
+            PopupMenuItem(value: 90, child: Text('Últimos 90 días')),
+          ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('$_rangeDays días'),
+                const Icon(Icons.arrow_drop_down),
+              ],
+            ),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: _loading ? null : refresh,
+        ),
+      ],
+    );
+
+    final body = _loading
+        ? const ListShimmer(itemCount: 4, itemHeight: 120)
+        : _error != null
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(_error!),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: refresh,
+                  child: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          )
+        : _report == null
+        ? const SizedBox.shrink()
+        : RefreshIndicator(
+            onRefresh: refresh,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              children: [
+                if (widget.embedded)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Estadísticas de ventas',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: primary,
+                                ),
+                          ),
+                        ),
+                        toolbar,
+                      ],
+                    ),
+                  ),
+                _SummaryCards(report: _report!, primary: primary),
+                const SizedBox(height: 24),
+                Text(
+                  'Ingresos diarios',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _RevenueLineChart(points: _daily, color: primary),
+                const SizedBox(height: 24),
+                Text(
+                  'Top repuestos vendidos (mes)',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _TopProductsBarChart(
+                  products: _report!.topProducts,
+                  color: primary,
+                ),
+              ],
+            ),
+          );
+
+    if (widget.embedded) {
+      return body;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const BrandedAppBarTitle(subtitle: 'Estadísticas de ventas'),
@@ -90,55 +196,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
           ),
         ],
       ),
-      body: _loading
-          ? const ListShimmer(itemCount: 4, itemHeight: 120)
-          : _error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(_error!),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: refresh,
-                    child: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: refresh,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                children: [
-                  _SummaryCards(report: _report!, primary: primary),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Ingresos diarios',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: primary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _RevenueLineChart(points: _daily, color: primary),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Top repuestos vendidos (mes)',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: primary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _TopProductsBarChart(
-                    products: _report!.topProducts,
-                    color: primary,
-                  ),
-                ],
-              ),
-            ),
+      body: body,
     );
   }
 }

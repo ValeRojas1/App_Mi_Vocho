@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -57,6 +58,18 @@ class _LoginScreenState extends State<LoginScreen>
   void _goHome() {
     if (widget.authNotifier.isAdmin) {
       context.go('/admin');
+    } else if (kIsWeb) {
+      Supabase.instance.client.auth.signOut();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'La versión web es solo para administradores. '
+            'Usa la app móvil si eres cliente o dueña.',
+          ),
+          backgroundColor: Color(0xFFC8102E),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } else if (widget.authNotifier.isOwner) {
       context.go('/owner');
     } else {
