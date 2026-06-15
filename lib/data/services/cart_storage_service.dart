@@ -11,9 +11,7 @@ class CartStorageService {
     if (raw == null || raw.isEmpty) return [];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
-      return list
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {
       return [];
     }

@@ -9,9 +9,7 @@ class OrderRepository {
     String? status,
     bool todayOnly = false,
   }) async {
-    var query = _client
-        .from('orders')
-        .select('*, order_items(*, products(*))');
+    var query = _client.from('orders').select('*, order_items(*, products(*))');
 
     if (clientId != null) {
       query = query.eq('client_id', clientId);
@@ -53,10 +51,7 @@ class OrderRepository {
         .eq('status', 'pending')
         .count(CountOption.exact);
 
-    return (
-      todayCount: todayRes.count,
-      pendingCount: pendingRes.count,
-    );
+    return (todayCount: todayRes.count, pendingCount: pendingRes.count);
   }
 
   /// Crea pedido e ítems y descuenta stock (RPC atómico en Supabase).
@@ -65,13 +60,17 @@ class OrderRepository {
     required String pickupType,
     required double total,
     required List<Map<String, dynamic>> items,
+    String paymentMethod = 'card',
+    String? shippingAgency,
   }) async {
     final payload = items
-        .map((item) => {
-              'product_id': item['product_id'],
-              'quantity': item['quantity'],
-              'unit_price': item['unit_price'],
-            })
+        .map(
+          (item) => {
+            'product_id': item['product_id'],
+            'quantity': item['quantity'],
+            'unit_price': item['unit_price'],
+          },
+        )
         .toList();
 
     try {
@@ -84,7 +83,13 @@ class OrderRepository {
           'p_items': payload,
         },
       );
-      return orderId as String;
+      final id = orderId.toString();
+      await _client
+          .from('orders')
+          .update({'payment_method': paymentMethod})
+          .eq('id', id);
+      await _updateShippingAgency(id, shippingAgency);
+      return id;
     } on PostgrestException catch (e) {
       if (e.code == '42883' ||
           e.message.contains('create_order_with_stock') ||
@@ -94,6 +99,8 @@ class OrderRepository {
           pickupType: pickupType,
           total: total,
           items: items,
+          paymentMethod: paymentMethod,
+          shippingAgency: shippingAgency,
         );
       }
       rethrow;
@@ -106,6 +113,8 @@ class OrderRepository {
     required String pickupType,
     required double total,
     required List<Map<String, dynamic>> items,
+    String paymentMethod = 'card',
+    String? shippingAgency,
   }) async {
     for (final item in items) {
       final productId = item['product_id'] as String;
@@ -122,14 +131,20 @@ class OrderRepository {
       if (stock < qty) throw Exception('insufficient_stock');
     }
 
-    final order = await _client.from('orders').insert({
-      'client_id': clientId,
-      'pickup_type': pickupType,
-      'total': total,
-      'status': 'pending',
-    }).select().single();
+    final order = await _client
+        .from('orders')
+        .insert({
+          'client_id': clientId,
+          'pickup_type': pickupType,
+          'total': total,
+          'status': 'pending',
+          'payment_method': paymentMethod,
+        })
+        .select()
+        .single();
 
     final orderId = order['id'] as String;
+    await _updateShippingAgency(orderId, shippingAgency);
     final orderItems = items
         .map((item) => {...item, 'order_id': orderId})
         .toList();
@@ -151,5 +166,22 @@ class OrderRepository {
     }
 
     return orderId;
+  }
+
+  Future<void> _updateShippingAgency(
+    String orderId,
+    String? shippingAgency,
+  ) async {
+    final agency = shippingAgency?.trim();
+    if (agency == null || agency.isEmpty) return;
+    try {
+      await _client
+          .from('orders')
+          .update({'shipping_agency': agency})
+          .eq('id', orderId);
+    } on PostgrestException catch (e) {
+      if (e.code == '42703' || e.message.contains('shipping_agency')) return;
+      rethrow;
+    }
   }
 }

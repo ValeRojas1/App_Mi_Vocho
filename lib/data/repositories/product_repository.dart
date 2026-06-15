@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product_model.dart';
@@ -27,6 +26,16 @@ class ProductRepository {
         .from('products')
         .select()
         .order('created_at', ascending: false);
+    return (response as List).map((e) => ProductModel.fromJson(e)).toList();
+  }
+
+  /// Stock y precio actuales de los productos del carrito.
+  Future<List<ProductModel>> getProductsByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    final response = await _client
+        .from('products')
+        .select()
+        .inFilter('id', ids);
     return (response as List).map((e) => ProductModel.fromJson(e)).toList();
   }
 
@@ -70,10 +79,7 @@ class ProductRepository {
         .lte('stock', lowStockThreshold)
         .count(CountOption.exact);
 
-    return (
-      activeCount: activeRes.count,
-      lowStockCount: lowStockRes.count,
-    );
+    return (activeCount: activeRes.count, lowStockCount: lowStockRes.count);
   }
 
   Future<void> updateImageUrl(String productId, String? imageUrl) async {
@@ -84,49 +90,28 @@ class ProductRepository {
   }
 
   /// Sube una imagen al bucket de Supabase Storage y devuelve la URL pública.
-  /// Acepta un archivo (mobile/desktop) o bytes (web). Debe pasarse exactamente uno.
   Future<String> uploadProductImage({
     required String productId,
-    File? file,
-    Uint8List? bytes,
+    required Uint8List bytes,
     String fileExtension = 'jpg',
   }) async {
-    assert(file != null || bytes != null,
-        'Debes pasar file o bytes para subir la imagen');
-
     final ext = fileExtension.replaceAll('.', '').toLowerCase();
     final contentType = _contentTypeFor(ext);
-    final path =
-        '$productId/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    final path = '$productId/${DateTime.now().millisecondsSinceEpoch}.$ext';
 
     final storage = _client.storage.from(_bucket);
-
-    if (file != null) {
-      await storage.upload(
-        path,
-        file,
-        fileOptions: FileOptions(
-          contentType: contentType,
-          upsert: true,
-        ),
-      );
-    } else {
-      await storage.uploadBinary(
-        path,
-        bytes!,
-        fileOptions: FileOptions(
-          contentType: contentType,
-          upsert: true,
-        ),
-      );
-    }
+    await storage.uploadBinary(
+      path,
+      bytes,
+      fileOptions: FileOptions(contentType: contentType, upsert: true),
+    );
 
     return storage.getPublicUrl(path);
   }
 
   /// Borra una imagen del bucket a partir de su URL pública.
   Future<void> deleteImageByUrl(String imageUrl) async {
-    final marker = '/object/public/$_bucket/';
+    const marker = '/object/public/$_bucket/';
     final idx = imageUrl.indexOf(marker);
     if (idx == -1) return;
     final path = imageUrl.substring(idx + marker.length);

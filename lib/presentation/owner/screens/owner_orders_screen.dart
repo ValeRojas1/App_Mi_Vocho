@@ -7,6 +7,8 @@ import '../../../data/repositories/order_repository.dart';
 import '../../shared/screens/order_detail_screen.dart';
 import '../../shared/widgets/list_shimmer.dart';
 import '../../shared/widgets/order_status_chip.dart';
+import '../../shared/widgets/branded_app_bar_title.dart';
+import '../widgets/owner_side_drawer.dart';
 
 enum _OrderFilter { all, pending, today }
 
@@ -100,8 +102,15 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
     final primary = theme.colorScheme.primary;
 
     return Scaffold(
+      drawer: const OwnerSideDrawer(),
       appBar: AppBar(
-        title: const Text('Gestión de Pedidos'),
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
+        title: const BrandedAppBarTitle(subtitle: 'Gestión de Pedidos'),
         actions: [
           IconButton(
             icon: Icon(Icons.refresh, color: primary),
@@ -143,52 +152,52 @@ class _OwnerOrdersScreenState extends State<OwnerOrdersScreen> {
             child: _loading
                 ? const ListShimmer()
                 : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(_error!),
-                            const SizedBox(height: 12),
-                            ElevatedButton(
-                              onPressed: _loadOrders,
-                              child: const Text('Reintentar'),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(_error!),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _loadOrders,
+                          child: const Text('Reintentar'),
                         ),
-                      )
-                    : _orders.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.receipt_long_outlined,
-                                  size: 64,
-                                  color: Colors.grey.shade400,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Sin pedidos en este filtro',
-                                  style: theme.textTheme.titleMedium,
-                                ),
-                              ],
-                            ),
-                          )
-                        : RefreshIndicator(
-                            onRefresh: _loadOrders,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.all(20),
-                              physics: const AlwaysScrollableScrollPhysics(
-                                parent: BouncingScrollPhysics(),
-                              ),
-                              itemCount: _orders.length,
-                              itemBuilder: (_, i) => _OrderCard(
-                                order: _orders[i],
-                                onTap: () => _openDetail(_orders[i]),
-                                onStatusChange: _changeStatus,
-                              ),
-                            ),
-                          ),
+                      ],
+                    ),
+                  )
+                : _orders.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.receipt_long_outlined,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Sin pedidos en este filtro',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadOrders,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(20),
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      itemCount: _orders.length,
+                      itemBuilder: (_, i) => _OrderCard(
+                        order: _orders[i],
+                        onTap: () => _openDetail(_orders[i]),
+                        onStatusChange: _changeStatus,
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -279,7 +288,11 @@ class _OrderCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(pickup.icon, size: 16, color: theme.colorScheme.primary),
+                      Icon(
+                        pickup.icon,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
                       const SizedBox(width: 6),
                       Text(pickup.label, style: const TextStyle(fontSize: 13)),
                     ],
@@ -305,15 +318,36 @@ class _OrderCard extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (order.shippingAgency != null &&
+                  order.shippingAgency!.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.local_shipping_outlined,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Agencia: ${order.shippingAgency}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Text(
                     'Cambiar a:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -321,12 +355,18 @@ class _OrderCard extends StatelessWidget {
                       child: DropdownButton<String>(
                         isExpanded: true,
                         isDense: true,
-                        hint: const Text('Estado', style: TextStyle(fontSize: 12)),
+                        hint: const Text(
+                          'Estado',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         items: nextStatuses.map((s) {
                           final st = OrderStatus.fromValue(s)!;
                           return DropdownMenuItem(
                             value: s,
-                            child: Text(st.ownerLabel, style: const TextStyle(fontSize: 12)),
+                            child: Text(
+                              st.ownerLabel,
+                              style: const TextStyle(fontSize: 12),
+                            ),
                           );
                         }).toList(),
                         onChanged: (val) {

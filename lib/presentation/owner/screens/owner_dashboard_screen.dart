@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:go_router/go_router.dart';
 import '../../../data/repositories/order_repository.dart';
 import '../../../data/repositories/product_repository.dart';
+import '../../shared/widgets/branded_app_bar_title.dart';
+import '../widgets/owner_side_drawer.dart';
 
 class OwnerDashboardScreen extends StatefulWidget {
-  const OwnerDashboardScreen({super.key});
+  final VoidCallback? onInitialLoadComplete;
+
+  const OwnerDashboardScreen({super.key, this.onInitialLoadComplete});
 
   @override
   State<OwnerDashboardScreen> createState() => OwnerDashboardScreenState();
@@ -22,6 +24,7 @@ class OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   int _pendingOrders = 0;
   int _activeProducts = 0;
   int _lowStock = 0;
+  bool _notifiedInitialLoad = false;
 
   @override
   void initState() {
@@ -42,8 +45,7 @@ class OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         _productRepo.getInventoryStats(),
       ]);
       final orderStats = results[0] as ({int todayCount, int pendingCount});
-      final productStats =
-          results[1] as ({int activeCount, int lowStockCount});
+      final productStats = results[1] as ({int activeCount, int lowStockCount});
 
       if (!mounted) return;
       setState(() {
@@ -53,13 +55,21 @@ class OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         _lowStock = productStats.lowStockCount;
         _loading = false;
       });
+      _notifyInitialLoadComplete();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
       });
+      _notifyInitialLoadComplete();
     }
+  }
+
+  void _notifyInitialLoadComplete() {
+    if (_notifiedInitialLoad) return;
+    _notifiedInitialLoad = true;
+    widget.onInitialLoadComplete?.call();
   }
 
   @override
@@ -68,24 +78,21 @@ class OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     final primary = theme.colorScheme.primary;
 
     return Scaffold(
+      drawer: const OwnerSideDrawer(),
       appBar: AppBar(
-        title: const Text('La Casa del Volkswagen'),
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
+        title: const BrandedAppBarTitle(),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Actualizar',
             color: primary,
             onPressed: _loading ? null : refresh,
-          ),
-          IconButton(
-            icon: Icon(Icons.logout, color: primary),
-            tooltip: 'Cerrar sesión',
-            onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
-              if (context.mounted) {
-                context.go('/login');
-              }
-            },
           ),
           const SizedBox(width: 8),
         ],
@@ -112,8 +119,11 @@ class OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             color: primary.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.admin_panel_settings,
-                              color: primary, size: 28),
+                          child: Icon(
+                            Icons.admin_panel_settings,
+                            color: primary,
+                            size: 28,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -154,8 +164,7 @@ class OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           const SizedBox(
                             width: 16,
                             height: 16,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                       ],
                     ),
@@ -168,18 +177,24 @@ class OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           color: Colors.red.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: Colors.red.withValues(alpha: 0.2)),
+                            color: Colors.red.withValues(alpha: 0.2),
+                          ),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline,
-                                color: Colors.red, size: 20),
+                            const Icon(
+                              Icons.error_outline,
+                              color: Colors.red,
+                              size: 20,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 'No se pudieron cargar las estadísticas: $_error',
                                 style: const TextStyle(
-                                    color: Colors.red, fontSize: 12),
+                                  color: Colors.red,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
                           ],
@@ -196,35 +211,33 @@ class OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   mainAxisSpacing: 16,
                   childAspectRatio: 1.15,
                 ),
-                delegate: SliverChildListDelegate(
-                  [
-                    _StatCard(
-                      label: 'Pedidos Hoy',
-                      value: _loading ? '--' : _todayOrders.toString(),
-                      icon: Icons.shopping_bag_outlined,
-                      color: primary,
-                    ),
-                    _StatCard(
-                      label: 'Por Confirmar',
-                      value: _loading ? '--' : _pendingOrders.toString(),
-                      icon: Icons.pending_actions,
-                      color: Colors.orange,
-                    ),
-                    _StatCard(
-                      label: 'Repuestos Activos',
-                      value: _loading ? '--' : _activeProducts.toString(),
-                      icon: Icons.inventory_2_outlined,
-                      color: Colors.teal,
-                    ),
-                    _StatCard(
-                      label: 'Stock Bajo',
-                      value: _loading ? '--' : _lowStock.toString(),
-                      icon: Icons.warning_amber_rounded,
-                      color: const Color(0xFFC8102E),
-                      highlight: !_loading && _lowStock > 0,
-                    ),
-                  ],
-                ),
+                delegate: SliverChildListDelegate([
+                  _StatCard(
+                    label: 'Pedidos Hoy',
+                    value: _loading ? '--' : _todayOrders.toString(),
+                    icon: Icons.shopping_bag_outlined,
+                    color: primary,
+                  ),
+                  _StatCard(
+                    label: 'Por Confirmar',
+                    value: _loading ? '--' : _pendingOrders.toString(),
+                    icon: Icons.pending_actions,
+                    color: Colors.orange,
+                  ),
+                  _StatCard(
+                    label: 'Repuestos Activos',
+                    value: _loading ? '--' : _activeProducts.toString(),
+                    icon: Icons.inventory_2_outlined,
+                    color: Colors.teal,
+                  ),
+                  _StatCard(
+                    label: 'Stock Bajo',
+                    value: _loading ? '--' : _lowStock.toString(),
+                    icon: Icons.warning_amber_rounded,
+                    color: const Color(0xFFC8102E),
+                    highlight: !_loading && _lowStock > 0,
+                  ),
+                ]),
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -234,13 +247,17 @@ class OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     decoration: BoxDecoration(
                       color: primary.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(20),
-                      border:
-                          Border.all(color: primary.withValues(alpha: 0.08)),
+                      border: Border.all(
+                        color: primary.withValues(alpha: 0.08),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.tips_and_updates,
-                            color: theme.colorScheme.secondary, size: 32),
+                        Icon(
+                          Icons.tips_and_updates,
+                          color: theme.colorScheme.secondary,
+                          size: 32,
+                        ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
@@ -266,7 +283,7 @@ class OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                               ),
                             ],
                           ),
-                        )
+                        ),
                       ],
                     ),
                   ),
@@ -344,10 +361,7 @@ class _StatCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   'Actualizado ahora',
-                  style: TextStyle(
-                    color: Colors.grey.shade400,
-                    fontSize: 10,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade400, fontSize: 10),
                 ),
               ],
             ),

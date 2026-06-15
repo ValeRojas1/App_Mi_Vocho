@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/auth/auth_notifier.dart';
@@ -5,6 +6,7 @@ import 'core/config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/utils/app_formatters.dart';
+import 'data/services/notification_service.dart';
 
 final authNotifier = AuthNotifier();
 
@@ -29,6 +31,9 @@ Future<void> main() async {
   }
 
   await AppFormatters.ensureInitialized();
+  if (!kIsWeb) {
+    await NotificationService.instance.initialize();
+  }
 
   runApp(const MiVochoApp());
 }

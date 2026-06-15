@@ -20,26 +20,26 @@ class ProductModel {
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) => ProductModel(
-        id: json['id'],
-        name: json['name'],
-        description: json['description'],
-        price: (json['price'] as num).toDouble(),
-        stock: json['stock'],
-        category: json['category'],
-        imageUrl: json['image_url'],
-        isActive: json['is_active'] ?? true,
-      );
+    id: json['id'],
+    name: json['name'],
+    description: json['description'],
+    price: (json['price'] as num).toDouble(),
+    stock: json['stock'],
+    category: json['category'],
+    imageUrl: json['image_url'],
+    isActive: json['is_active'] ?? true,
+  );
 
   Map<String, dynamic> toJson() => {
-        if (id.isNotEmpty) 'id': id,
-        'name': name,
-        'description': description,
-        'price': price,
-        'stock': stock,
-        'category': category,
-        'image_url': imageUrl,
-        'is_active': isActive,
-      };
+    if (id.isNotEmpty) 'id': id,
+    'name': name,
+    'description': description,
+    'price': price,
+    'stock': stock,
+    'category': category,
+    'image_url': imageUrl,
+    'is_active': isActive,
+  };
 
   ProductModel copyWith({
     String? id,

@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // Paletas principales
-  static const Color vwBlue = Color(0xFF003087);        // Azul Corporativo VW
-  static const Color warmYellow = Color(0xFFFFC72C);    // Amarillo cálido brillante
-  static const Color creamVintage = Color(0xFFF5E1A4);  // Crema vintage / Amarillo suave
-  static const Color detailRed = Color(0xFFC8102E);     // Rojo de detalles/acentos
-  
+  static const Color vwBlue = Color(0xFF003087); // Azul Corporativo VW
+  static const Color warmYellow = Color(
+    0xFFFFC72C,
+  ); // Amarillo cálido brillante
+  static const Color creamVintage = Color(
+    0xFFF5E1A4,
+  ); // Crema vintage / Amarillo suave
+  static const Color detailRed = Color(0xFFC8102E); // Rojo de detalles/acentos
+
   // Fondo de dueña (blanco fresco elegante)
   static const Color ownerBg = Color(0xFFF8FAFC);
   // Fondo de cliente (crema cálido vintage agradable)
@@ -54,23 +58,31 @@ class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: primary.withValues(alpha: 0.06),
-            width: 1,
-          ),
+          side: BorderSide(color: primary.withValues(alpha: 0.06), width: 1),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: brightness == Brightness.dark ? Colors.grey.shade900 : Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        fillColor: brightness == Brightness.dark
+            ? Colors.grey.shade900
+            : Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primary.withValues(alpha: 0.12), width: 1.2),
+          borderSide: BorderSide(
+            color: primary.withValues(alpha: 0.12),
+            width: 1.2,
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primary.withValues(alpha: 0.1), width: 1.2),
+          borderSide: BorderSide(
+            color: primary.withValues(alpha: 0.1),
+            width: 1.2,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -80,7 +92,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: detailRed, width: 1.2),
         ),
-        labelStyle: TextStyle(color: primary.withValues(alpha: 0.6), fontSize: 14),
+        labelStyle: TextStyle(
+          color: primary.withValues(alpha: 0.6),
+          fontSize: 14,
+        ),
         hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -89,9 +104,15 @@ class AppTheme {
           foregroundColor: Colors.white,
           elevation: 1,
           shadowColor: primary.withValues(alpha: 0.25),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 28),
-          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.3),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            letterSpacing: 0.3,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -152,6 +173,16 @@ class AppTheme {
     scaffoldBg: clientBg,
     cardColor: Colors.white,
     appBarColor: clientBg,
+  );
+
+  // Tema del panel de administración web
+  static final adminTheme = _buildTheme(
+    brightness: Brightness.light,
+    primary: vwBlue,
+    secondary: warmYellow,
+    scaffoldBg: const Color(0xFFF1F5F9),
+    cardColor: Colors.white,
+    appBarColor: Colors.white,
   );
 
   static final dark = ThemeData(

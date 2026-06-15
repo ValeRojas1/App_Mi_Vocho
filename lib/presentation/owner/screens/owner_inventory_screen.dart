@@ -1,11 +1,13 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/utils/app_formatters.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/repositories/product_repository.dart';
+import '../../shared/widgets/branded_app_bar_title.dart';
+import '../widgets/owner_side_drawer.dart';
 
 class OwnerInventoryScreen extends StatefulWidget {
   const OwnerInventoryScreen({super.key});
@@ -43,7 +45,16 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
     final primary = theme.colorScheme.primary;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Inventario de Repuestos')),
+      drawer: const OwnerSideDrawer(),
+      appBar: AppBar(
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
+        title: const BrandedAppBarTitle(subtitle: 'Inventario de Repuestos'),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openForm(context, null),
         backgroundColor: primary,
@@ -193,10 +204,13 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
                   prefixIcon: Icon(Icons.inventory_2_outlined),
                 ),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Ingresa una cantidad';
+                  if (v == null || v.isEmpty) {
+                    return 'Ingresa una cantidad';
+                  }
                   final val = int.tryParse(v);
-                  if (val == null || val < 0)
+                  if (val == null || val < 0) {
                     return 'Ingresa un número entero válido';
+                  }
                   return null;
                 },
               ),
@@ -342,7 +356,7 @@ class _ProductTile extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            'S/. ${product.price.toStringAsFixed(2)}',
+                            AppFormatters.currency(product.price),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
@@ -360,16 +374,17 @@ class _ProductTile extends StatelessWidget {
                                 ),
                                 decoration: BoxDecoration(
                                   color: lowStock
-                                      ? const Color(0xFFC8102E)
-                                          .withValues(alpha: 0.08)
+                                      ? const Color(
+                                          0xFFC8102E,
+                                        ).withValues(alpha: 0.08)
                                       : Colors.green.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
                                     color: lowStock
-                                        ? const Color(0xFFC8102E)
-                                            .withValues(alpha: 0.2)
-                                        : Colors.green
-                                            .withValues(alpha: 0.2),
+                                        ? const Color(
+                                            0xFFC8102E,
+                                          ).withValues(alpha: 0.2)
+                                        : Colors.green.withValues(alpha: 0.2),
                                   ),
                                 ),
                                 child: Row(
@@ -518,6 +533,8 @@ class _ProductFormScreenState extends State<_ProductFormScreen> {
   bool _removeImage = false;
 
   bool get _isEditing => widget.existing != null;
+  double? get _parsedPrice =>
+      double.tryParse(_priceCtrl.text.trim().replaceAll(',', '.'));
 
   @override
   void initState() {
@@ -745,7 +762,7 @@ class _ProductFormScreenState extends State<_ProductFormScreen> {
         category: _catCtrl.text.trim().isEmpty
             ? 'General'
             : _catCtrl.text.trim(),
-        price: double.parse(_priceCtrl.text),
+        price: _parsedPrice!,
         stock: int.parse(_stockCtrl.text),
         imageUrl: _removeImage ? null : _imageUrl,
         isActive: widget.existing?.isActive ?? true,
@@ -758,10 +775,10 @@ class _ProductFormScreenState extends State<_ProductFormScreen> {
       // 2) Si seleccionó una imagen nueva, la subimos y actualizamos la URL.
       if (_pickedImage != null) {
         final ext = _extensionFromName(_pickedImage!.name);
+        final bytes = _pickedBytes ?? await _pickedImage!.readAsBytes();
         final url = await widget.repository.uploadProductImage(
           productId: saved.id,
-          file: kIsWeb ? null : File(_pickedImage!.path),
-          bytes: kIsWeb ? _pickedBytes : null,
+          bytes: bytes,
           fileExtension: ext,
         );
         await widget.repository.updateImageUrl(saved.id, url);
@@ -911,9 +928,12 @@ class _ProductFormScreenState extends State<_ProductFormScreen> {
                           hintText: '0.00',
                         ),
                         validator: (v) {
-                          if (v == null || v.isEmpty)
+                          if (v == null || v.isEmpty) {
                             return 'Ingresa el precio';
-                          final val = double.tryParse(v);
+                          }
+                          final val = double.tryParse(
+                            v.trim().replaceAll(',', '.'),
+                          );
                           if (val == null || val <= 0) return 'Precio inválido';
                           return null;
                         },
@@ -1063,9 +1083,9 @@ class _ImagePickerField extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
+                  children: [
                     Icon(
                       Icons.camera_alt_outlined,
                       color: Colors.white,

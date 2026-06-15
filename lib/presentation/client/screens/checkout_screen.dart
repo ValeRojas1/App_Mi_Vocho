@@ -21,6 +21,15 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
+  static const _customShippingAgency = 'Otra agencia';
+  static const _shippingAgencies = [
+    'Shalom',
+    'Cargo 1',
+    'Olva',
+    'Serpost',
+    _customShippingAgency,
+  ];
+
   final _repo = OrderRepository();
   final _formKey = GlobalKey<FormState>();
 
@@ -30,8 +39,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _expiry = TextEditingController();
   final _cvv = TextEditingController();
 
-  String _pickupType = 'local';
+  String _pickupType = PickupType.local.value;
+  PaymentMethod _paymentMethod = PaymentMethod.card;
+  String _shippingAgency = _shippingAgencies.first;
+  final _paymentRefCtrl = TextEditingController();
+  final _customAgencyCtrl = TextEditingController();
   bool _processing = false;
+
+  bool get _isInterprovincial =>
+      _pickupType == PickupType.interprovincial.value;
+
+  String? get _selectedShippingAgency {
+    if (!_isInterprovincial) return null;
+    if (_shippingAgency != _customShippingAgency) return _shippingAgency;
+    final custom = _customAgencyCtrl.text.trim();
+    return custom.isEmpty ? null : custom;
+  }
+
+  List<PaymentMethod> get _availablePaymentMethods => _isInterprovincial
+      ? PaymentMethod.values.where((m) => m != PaymentMethod.inStore).toList()
+      : PaymentMethod.values;
 
   @override
   void dispose() {
@@ -39,31 +66,73 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _cardHolder.dispose();
     _expiry.dispose();
     _cvv.dispose();
+    _paymentRefCtrl.dispose();
+    _customAgencyCtrl.dispose();
     super.dispose();
+  }
+
+  void _selectPickupType(String value) {
+    setState(() {
+      _pickupType = value;
+      if (_isInterprovincial && _paymentMethod == PaymentMethod.inStore) {
+        _paymentMethod = PaymentMethod.card;
+      }
+    });
   }
 
   // Simula procesamiento de pago (en producción usar Culqi SDK)
   Future<void> _processPayment() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isInterprovincial && _selectedShippingAgency == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selecciona o ingresa una agencia de envío.'),
+        ),
+      );
+      return;
+    }
+
+    if (_paymentMethod.requiresCardForm) {
+      if (!_formKey.currentState!.validate()) return;
+    } else if (_paymentMethod == PaymentMethod.yape ||
+        _paymentMethod == PaymentMethod.plin) {
+      if (_paymentRefCtrl.text.trim().length < 6) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ingresa el número de operación o celular del pago.'),
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _processing = true);
     try {
-      // Simular delay de pasarela
-      await Future.delayed(const Duration(seconds: 2));
+      if (_paymentMethod == PaymentMethod.card) {
+        await Future.delayed(const Duration(seconds: 2));
+      } else {
+        await Future.delayed(const Duration(milliseconds: 800));
+      }
 
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception('No autenticado');
 
-      final items = widget.cart.map((item) => {
-        'product_id': item['product_id'],
-        'quantity': item['quantity'],
-        'unit_price': item['unit_price'],
-      }).toList();
+      final items = widget.cart
+          .map(
+            (item) => {
+              'product_id': item['product_id'],
+              'quantity': item['quantity'],
+              'unit_price': item['unit_price'],
+            },
+          )
+          .toList();
 
       final orderId = await _repo.createOrder(
         clientId: user.id,
         pickupType: _pickupType,
         total: widget.total,
         items: items,
+        paymentMethod: _paymentMethod.value,
+        shippingAgency: _selectedShippingAgency,
       );
 
       if (!mounted) return;
@@ -107,18 +176,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 24),
               const Text(
                 '¡Pago Exitoso!',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 0.2),
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.2,
+                ),
               ),
               const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   'Pedido #${AppFormatters.orderShortId(orderId)}',
-                  style: TextStyle(color: primary, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(
+                    color: primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -127,7 +207,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ? '✅ Tu pedido ha sido registrado. Puedes recoger tu repuesto en tienda cuando esté listo.'
                     : '📦 Tu pedido se enviará por encomienda interprovincial a la brevedad.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.4),
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
               ),
             ],
           ),
@@ -144,9 +228,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: const Text('VER MIS PEDIDOS', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text(
+                'VER MIS PEDIDOS',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -173,7 +262,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Card(
                 elevation: 4,
                 shadowColor: primary.withValues(alpha: 0.1),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -193,12 +284,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           children: [
                             Text(
                               'Total a pagar',
-                              style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             SizedBox(height: 4),
                             Text(
                               'Mi Vocho Repuestos',
-                              style: TextStyle(color: Colors.white54, fontSize: 11),
+                              style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 11,
+                              ),
                             ),
                           ],
                         ),
@@ -270,7 +368,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       label: 'Recojo en tienda',
                       subtitle: 'Huancayo',
                       selected: _pickupType == PickupType.local.value,
-                      onTap: () => setState(() => _pickupType = PickupType.local.value),
+                      onTap: () => _selectPickupType(PickupType.local.value),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -281,138 +379,221 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       subtitle: 'Todo el Perú',
                       selected: _pickupType == PickupType.interprovincial.value,
                       onTap: () =>
-                          setState(() => _pickupType = PickupType.interprovincial.value),
+                          _selectPickupType(PickupType.interprovincial.value),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 28),
-
-              // Datos de tarjeta
+              if (_isInterprovincial) ...[
+                const SizedBox(height: 16),
+                _ShippingAgencyPanel(
+                  agencies: _shippingAgencies,
+                  selectedAgency: _shippingAgency,
+                  customAgencyLabel: _customShippingAgency,
+                  customAgencyController: _customAgencyCtrl,
+                  onAgencyChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _shippingAgency = value);
+                  },
+                  onCustomAgencyChanged: (_) => setState(() {}),
+                ),
+              ],
+              const SizedBox(height: 24),
               Text(
-                'Datos de Tarjeta',
+                'Método de pago',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: primary,
                 ),
               ),
-              const SizedBox(height: 12),
-              
-              TextFormField(
-                controller: _cardNumber,
-                decoration: const InputDecoration(
-                  labelText: 'Número de tarjeta',
-                  prefixIcon: Icon(Icons.credit_card),
-                  hintText: '4242 4242 4242 4242',
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _availablePaymentMethods.map((m) {
+                  final selected = _paymentMethod == m;
+                  return ChoiceChip(
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(m.icon, size: 16),
+                        const SizedBox(width: 4),
+                        Text(m.label),
+                      ],
+                    ),
+                    selected: selected,
+                    onSelected: (_) => setState(() => _paymentMethod = m),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              if (_paymentMethod == PaymentMethod.inStore)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Pagarás al recoger en La Casa del Volkswagen. '
+                    'Te avisaremos cuando tu pedido esté listo.',
+                    style: TextStyle(fontSize: 13, height: 1.35),
+                  ),
                 ),
-                keyboardType: TextInputType.number,
-                maxLength: 19,
-                validator: (v) => (v?.replaceAll(' ', '').length ?? 0) < 16
-                    ? 'Número inválido (mínimo 16 dígitos)' : null,
-                onChanged: (v) {
-                  final digits = v.replaceAll(' ', '');
-                  final formatted = digits.replaceAllMapped(
-                      RegExp(r'.{4}'), (m) => '${m.group(0)} ').trim();
-                  _cardNumber.value = TextEditingValue(
+              if (_paymentMethod == PaymentMethod.yape ||
+                  _paymentMethod == PaymentMethod.plin) ...[
+                Text(
+                  'Envía el pago por ${_paymentMethod.label} y registra la operación:',
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _paymentRefCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Nº operación / celular',
+                    prefixIcon: Icon(_paymentMethod.icon),
+                  ),
+                ),
+              ],
+              if (_paymentMethod.requiresCardForm) ...[
+                Text(
+                  'Datos de Tarjeta',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _cardNumber,
+                  decoration: const InputDecoration(
+                    labelText: 'Número de tarjeta',
+                    prefixIcon: Icon(Icons.credit_card),
+                    hintText: '4242 4242 4242 4242',
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 19,
+                  validator: (v) => (v?.replaceAll(' ', '').length ?? 0) < 16
+                      ? 'Número inválido (mínimo 16 dígitos)'
+                      : null,
+                  onChanged: (v) {
+                    final digits = v.replaceAll(' ', '');
+                    final formatted = digits
+                        .replaceAllMapped(
+                          RegExp(r'.{4}'),
+                          (m) => '${m.group(0)} ',
+                        )
+                        .trim();
+                    _cardNumber.value = TextEditingValue(
                       text: formatted,
                       selection: TextSelection.collapsed(
-                          offset: formatted.length));
-                },
-              ),
-              const SizedBox(height: 12),
-              
-              TextFormField(
-                controller: _cardHolder,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del titular',
-                  prefixIcon: Icon(Icons.person_outline),
-                ),
-                textCapitalization: TextCapitalization.words,
-                validator: (v) =>
-                    (v?.trim().isEmpty ?? true) ? 'Ingresa el nombre del titular' : null,
-              ),
-              const SizedBox(height: 12),
-              
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _expiry,
-                      decoration: const InputDecoration(
-                        labelText: 'Vencimiento',
-                        hintText: 'MM/AA',
-                        prefixIcon: Icon(Icons.calendar_month_outlined),
+                        offset: formatted.length,
                       ),
-                      maxLength: 5,
-                      validator: (v) =>
-                          (v?.length ?? 0) < 5 ? 'Vencimiento inválido' : null,
-                      onChanged: (v) {
-                        if (v.length == 2 && !v.contains('/')) {
-                          _expiry.text = '$v/';
-                          _expiry.selection = TextSelection.collapsed(
-                              offset: _expiry.text.length);
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _cvv,
-                      decoration: const InputDecoration(
-                        labelText: 'CVV',
-                        hintText: '123',
-                        prefixIcon: Icon(Icons.lock_outline),
-                      ),
-                      keyboardType: TextInputType.number,
-                      obscureText: true,
-                      maxLength: 3,
-                      validator: (v) =>
-                          (v?.length ?? 0) < 3 ? 'CVV inválido' : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: primary.withValues(alpha: 0.08)),
+                    );
+                  },
                 ),
-                child: Row(
+                const SizedBox(height: 12),
+
+                TextFormField(
+                  controller: _cardHolder,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del titular',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (v) => (v?.trim().isEmpty ?? true)
+                      ? 'Ingresa el nombre del titular'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+
+                Row(
                   children: [
-                    Icon(Icons.info_outline, color: primary, size: 16),
-                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        'Modo Prototipo: Cualquier valor formal de simulación es válido.',
-                        style: TextStyle(color: primary.withValues(alpha: 0.8), fontSize: 12),
+                      child: TextFormField(
+                        controller: _expiry,
+                        decoration: const InputDecoration(
+                          labelText: 'Vencimiento',
+                          hintText: 'MM/AA',
+                          prefixIcon: Icon(Icons.calendar_month_outlined),
+                        ),
+                        maxLength: 5,
+                        validator: (v) => (v?.length ?? 0) < 5
+                            ? 'Vencimiento inválido'
+                            : null,
+                        onChanged: (v) {
+                          if (v.length == 2 && !v.contains('/')) {
+                            _expiry.text = '$v/';
+                            _expiry.selection = TextSelection.collapsed(
+                              offset: _expiry.text.length,
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _cvv,
+                        decoration: const InputDecoration(
+                          labelText: 'CVV',
+                          hintText: '123',
+                          prefixIcon: Icon(Icons.lock_outline),
+                        ),
+                        keyboardType: TextInputType.number,
+                        obscureText: true,
+                        maxLength: 3,
+                        validator: (v) =>
+                            (v?.length ?? 0) < 3 ? 'CVV inválido' : null,
                       ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 8),
+
+                if (_paymentMethod == PaymentMethod.card)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Pago con tarjeta en modo demostración. Integración Culqi pendiente.',
+                      style: TextStyle(
+                        color: primary.withValues(alpha: 0.85),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+              ],
               const SizedBox(height: 28),
-              
+
               SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton.icon(
                   icon: _processing
-                      ? const SizedBox(width: 20, height: 20,
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2))
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
                       : const Icon(Icons.lock_outline),
-                  label: Text(_processing
-                      ? 'Procesando Pago...'
-                      : 'PAGAR ${AppFormatters.currency(widget.total)}'),
+                  label: Text(
+                    _processing
+                        ? 'Procesando...'
+                        : 'CONFIRMAR ${AppFormatters.currency(widget.total)}',
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                   onPressed: _processing ? null : _processPayment,
                 ),
@@ -425,6 +606,153 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 }
 
+class _ShippingAgencyPanel extends StatelessWidget {
+  final List<String> agencies;
+  final String selectedAgency;
+  final String customAgencyLabel;
+  final TextEditingController customAgencyController;
+  final ValueChanged<String?> onAgencyChanged;
+  final ValueChanged<String> onCustomAgencyChanged;
+
+  const _ShippingAgencyPanel({
+    required this.agencies,
+    required this.selectedAgency,
+    required this.customAgencyLabel,
+    required this.customAgencyController,
+    required this.onAgencyChanged,
+    required this.onCustomAgencyChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final isCustom = selectedAgency == customAgencyLabel;
+    final summary = isCustom && customAgencyController.text.trim().isNotEmpty
+        ? customAgencyController.text.trim()
+        : selectedAgency;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: primary.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.local_shipping_outlined,
+                  color: primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Agencia de envío',
+                      style: TextStyle(
+                        color: primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: selectedAgency,
+                isExpanded: true,
+                icon: Icon(Icons.keyboard_arrow_down_rounded, color: primary),
+                items: agencies
+                    .map(
+                      (agency) => DropdownMenuItem(
+                        value: agency,
+                        child: Row(
+                          children: [
+                            Icon(
+                              agency == customAgencyLabel
+                                  ? Icons.edit_location_alt_outlined
+                                  : Icons.inventory_2_outlined,
+                              color: Colors.grey.shade600,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              agency,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: onAgencyChanged,
+              ),
+            ),
+          ),
+          if (isCustom) ...[
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: customAgencyController,
+              onChanged: onCustomAgencyChanged,
+              decoration: const InputDecoration(
+                hintText: 'Escribe el nombre de la agencia',
+                prefixIcon: Icon(Icons.edit_outlined),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _DeliveryOption extends StatelessWidget {
   final IconData icon;
   final String label, subtitle;
@@ -432,8 +760,11 @@ class _DeliveryOption extends StatelessWidget {
   final VoidCallback onTap;
 
   const _DeliveryOption({
-    required this.icon, required this.label, required this.subtitle,
-    required this.selected, required this.onTap,
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
   });
 
   @override
@@ -459,19 +790,27 @@ class _DeliveryOption extends StatelessWidget {
               color: Colors.black.withValues(alpha: selected ? 0.04 : 0.01),
               blurRadius: 10,
               offset: const Offset(0, 4),
-            )
+            ),
           ],
         ),
         child: Column(
           children: [
             Icon(icon, color: selected ? primary : Colors.grey, size: 24),
             const SizedBox(height: 8),
-            Text(label, textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.bold,
-                    color: selected ? primary : Colors.grey.shade700)),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: selected ? primary : Colors.grey.shade700,
+              ),
+            ),
             const SizedBox(height: 2),
-            Text(subtitle, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+            Text(
+              subtitle,
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
+            ),
           ],
         ),
       ),

@@ -12,6 +12,7 @@ class AuthNotifier extends ChangeNotifier {
   String? get role => _role;
   bool get isOwner => _role == AppRole.owner.value;
   bool get isClient => _role == AppRole.client.value;
+  bool get isAdmin => _role == AppRole.admin.value;
   bool get loading => _loading;
 
   Future<void> loadRole() async {

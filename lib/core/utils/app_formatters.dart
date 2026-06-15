@@ -11,13 +11,11 @@ class AppFormatters {
     _ready = true;
   }
 
+  /// Formato peruano con punto decimal (ej. S/. 25.50).
   static String currency(double amount) {
     _ensureReady();
-    return NumberFormat.currency(
-      locale: 'es_PE',
-      symbol: 'S/. ',
-      decimalDigits: 2,
-    ).format(amount);
+    final formatted = NumberFormat('#,##0.00', 'en_US').format(amount);
+    return 'S/. $formatted';
   }
 
   static String date(DateTime dt) {

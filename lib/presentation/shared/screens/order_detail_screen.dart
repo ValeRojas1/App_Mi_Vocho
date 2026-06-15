@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/order_constants.dart';
 import '../../../core/utils/app_formatters.dart';
 import '../../../data/models/order_model.dart';
+import '../../client/screens/store_map_screen.dart';
 import '../widgets/order_status_chip.dart';
 
 class OrderDetailScreen extends StatelessWidget {
@@ -36,7 +37,9 @@ class OrderDetailScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         children: [
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -45,10 +48,16 @@ class OrderDetailScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      OrderStatusChip(status: order.status, ownerView: ownerView),
+                      OrderStatusChip(
+                        status: order.status,
+                        ownerView: ownerView,
+                      ),
                       Text(
                         AppFormatters.dateTime(order.createdAt),
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -63,6 +72,27 @@ class OrderDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (order.paymentMethod != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Pago: ${PaymentMethod.fromValue(order.paymentMethod).label}',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                  if (order.shippingAgency != null &&
+                      order.shippingAgency!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Agencia: ${order.shippingAgency}',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                   if (order.total != null) ...[
                     const SizedBox(height: 12),
                     Text(
@@ -78,6 +108,22 @@ class OrderDetailScreen extends StatelessWidget {
               ),
             ),
           ),
+          if (!ownerView && pickup == PickupType.local) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const StoreMapScreen(emphasizePickup: true),
+                  ),
+                ),
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('Cómo llegar a la tienda'),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           Text(
             'Repuestos',
@@ -116,7 +162,10 @@ class OrderDetailScreen extends StatelessWidget {
                           : Icon(Icons.build_outlined, color: primary),
                     ),
                   ),
-                  title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(
+                    name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   subtitle: Text(
                     '${item.quantity} × ${AppFormatters.currency(item.unitPrice)}',
                   ),
@@ -147,10 +196,7 @@ class OrderDetailScreen extends StatelessWidget {
               ),
               items: nextStatuses.map((s) {
                 final st = OrderStatus.fromValue(s)!;
-                return DropdownMenuItem(
-                  value: s,
-                  child: Text(st.ownerLabel),
-                );
+                return DropdownMenuItem(value: s, child: Text(st.ownerLabel));
               }).toList(),
               onChanged: (val) {
                 if (val != null) onStatusChange!(order.id, val);

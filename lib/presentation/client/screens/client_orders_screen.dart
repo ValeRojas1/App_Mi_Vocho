@@ -6,6 +6,7 @@ import '../../../core/utils/app_errors.dart';
 import '../../../data/models/order_model.dart';
 import '../../../data/repositories/order_repository.dart';
 import '../../shared/screens/order_detail_screen.dart';
+import '../../shared/widgets/branded_app_bar_title.dart';
 import '../../shared/widgets/list_shimmer.dart';
 import '../../shared/widgets/order_status_chip.dart';
 
@@ -50,9 +51,7 @@ class ClientOrdersScreenState extends State<ClientOrdersScreen> {
   void _openDetail(OrderModel order) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => OrderDetailScreen(order: order),
-      ),
+      MaterialPageRoute(builder: (_) => OrderDetailScreen(order: order)),
     );
   }
 
@@ -63,36 +62,38 @@ class ClientOrdersScreenState extends State<ClientOrdersScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis Pedidos de Repuestos'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: primary),
-            onPressed: _loading ? null : refresh,
-          ),
-          const SizedBox(width: 8),
-        ],
+        title: const BrandedAppBarTitle(subtitle: 'Mis Pedidos de Repuestos'),
       ),
       body: _loading
           ? const ListShimmer()
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: refresh,
-                          child: const Text('Reintentar'),
-                        ),
-                      ],
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: refresh,
+                      child: const Text('Reintentar'),
                     ),
-                  ),
-                )
-              : _orders.isEmpty
-                  ? Center(
+                  ],
+                ),
+              ),
+            )
+          : _orders.isEmpty
+          ? RefreshIndicator(
+              onRefresh: refresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height * 0.5,
+                    child: Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
                         child: Column(
@@ -130,111 +131,114 @@ class ClientOrdersScreenState extends State<ClientOrdersScreen> {
                           ],
                         ),
                       ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: refresh,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(20),
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: BouncingScrollPhysics(),
-                        ),
-                        itemCount: _orders.length,
-                        itemBuilder: (_, i) {
-                          final o = _orders[i];
-                          final status = OrderStatus.fromValue(o.status);
-                          final color = status?.color ?? Colors.grey;
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                              side: BorderSide(color: Colors.grey.shade100),
-                            ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(18),
-                              onTap: () => _openDetail(o),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: color.withValues(alpha: 0.08),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        status?.icon ?? Icons.receipt_outlined,
-                                        color: color,
-                                        size: 26,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                'Pedido #${AppFormatters.orderShortId(o.id)}',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                              Text(
-                                                AppFormatters.date(o.createdAt),
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade400,
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          OrderStatusChip(status: o.status),
-                                          if (o.total != null)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 8),
-                                              child: Text(
-                                                AppFormatters.currency(o.total!),
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade700,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ),
-                                          if (o.items.isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 4),
-                                              child: Text(
-                                                '${o.items.length} repuesto(s) · Ver detalle',
-                                                style: TextStyle(
-                                                  color: primary,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.chevron_right,
-                                      color: Colors.grey.shade400,
-                                    ),
-                                  ],
-                                ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: refresh,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(20),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                itemCount: _orders.length,
+                itemBuilder: (_, i) {
+                  final o = _orders[i];
+                  final status = OrderStatus.fromValue(o.status);
+                  final color = status?.color ?? Colors.grey;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      side: BorderSide(color: Colors.grey.shade100),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: () => _openDetail(o),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.08),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                status?.icon ?? Icons.receipt_outlined,
+                                color: color,
+                                size: 26,
                               ),
                             ),
-                          );
-                        },
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Pedido #${AppFormatters.orderShortId(o.id)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        AppFormatters.date(o.createdAt),
+                                        style: TextStyle(
+                                          color: Colors.grey.shade400,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  OrderStatusChip(status: o.status),
+                                  if (o.total != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        AppFormatters.currency(o.total!),
+                                        style: TextStyle(
+                                          color: Colors.grey.shade700,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  if (o.items.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        '${o.items.length} repuesto(s) · Ver detalle',
+                                        style: TextStyle(
+                                          color: primary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right,
+                              color: Colors.grey.shade400,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }
