@@ -30,12 +30,13 @@ class AuthNotifier extends ChangeNotifier {
       while (_loading) {
         await Future<void>.delayed(const Duration(milliseconds: 16));
       }
-      return;
+      if (_role != null) return;
     }
     await loadRole();
   }
 
   void clear() {
+    if (_role == null && !_loading) return;
     _role = null;
     _loading = false;
     notifyListeners();

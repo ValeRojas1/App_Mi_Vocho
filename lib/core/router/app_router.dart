@@ -31,12 +31,13 @@ class AppRouter {
         final isLogin = loc == '/login';
 
         if (session == null) {
-          authNotifier.clear();
           return isLogin ? null : '/login';
         }
 
-        if (authNotifier.role == null) {
+        if (authNotifier.role == null && !authNotifier.loading) {
           await authNotifier.ensureRoleLoaded();
+        } else if (authNotifier.loading) {
+          return null;
         }
 
         final role =
